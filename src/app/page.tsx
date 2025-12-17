@@ -1,65 +1,194 @@
-import Image from "next/image";
+"use client";
+import { useState, useEffect } from "react";
+// If using shadcn later:
+// import { Button } from "@/components/ui/button";
 
 export default function Home() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<null | {
+    status: string;
+    timeIn: string;
+    date: string;
+  }>(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formattedTime = currentTime.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true
+  });
+
+  const formattedDate = currentTime.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  });
+
+  const timeIn = async () => {
+    if (!name || !email) {
+      alert("Please enter your name and email");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/time-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.message);
+        setLoading(false);
+        return;
+      }
+
+      setResult({
+        status: data.status,
+        timeIn: data.timeIn,
+        date: data.date
+      });
+    } catch (err) {
+      alert("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "#e0e0e0"
+      }}
+    >
+      <div
+        style={{
+          width: 400,
+          padding: 30,
+          backgroundColor: "#ffffff",
+          borderRadius: 8,
+          boxShadow: "0 8px 20px rgba(0,0,0,0.1)"
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 20
+          }}
+        >
+          <img src="/logo.png" alt="Company Logo" style={{ height: 40 }} />
+          <span style={{ fontWeight: "bold", fontSize: 18 }}>
+            WFH Time In
+          </span>
+        </div>
+
+        {/* Clock */}
+        <h1
+          style={{
+            fontSize: 55,
+            fontWeight: "bold",
+            margin: "10px 0",
+            textAlign: "center"
+          }}
+        >
+          {formattedTime}
+        </h1>
+
+        {/* Date */}
+        <p style={{ textAlign: "center", color: "#555", marginBottom: 30 }}>
+          {formattedDate}
+        </p>
+
+        {/* Inputs */}
+        <input
+          type="text"
+          placeholder="Name"
+          value={name}
+          disabled={!!result}
+          onChange={e => setName(e.target.value)}
+          style={{
+            width: "100%",
+            padding: 12,
+            marginBottom: 15,
+            borderRadius: 6,
+            border: "1px solid #ccc",
+            fontSize: 16
+          }}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          disabled={!!result}
+          onChange={e => setEmail(e.target.value)}
+          style={{
+            width: "100%",
+            padding: 12,
+            marginBottom: 25,
+            borderRadius: 6,
+            border: "1px solid #ccc",
+            fontSize: 16
+          }}
+        />
+
+        {/* Button */}
+        <button
+          onClick={timeIn}
+          disabled={loading || !!result}
+          style={{
+            width: "100%",
+            padding: 14,
+            backgroundColor: loading || result ? "#9ca3af" : "#2563eb",
+            color: "#fff",
+            border: "none",
+            borderRadius: 6,
+            fontSize: 18,
+            cursor: loading || result ? "not-allowed" : "pointer"
+          }}
+        >
+          {loading ? "Recording..." : result ? "Time In Recorded" : "Time In"}
+        </button>
+
+        {/* Result */}
+        {result && (
+          <div
+            style={{
+              marginTop: 20,
+              padding: 15,
+              borderRadius: 6,
+              backgroundColor:
+                result.status === "On Time" ? "#dcfce7" : "#fee2e2",
+              color: result.status === "On Time" ? "#166534" : "#991b1b",
+              textAlign: "center"
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <strong>{result.status}</strong>
+            <br />
+            {result.timeIn} • {result.date}
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
