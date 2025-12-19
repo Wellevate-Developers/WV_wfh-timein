@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { headers } from "next/headers";
 import { addTimeInToQueue } from "@/lib/emailQueue"; // handles delayed email sending
 
 export const runtime = "nodejs";
@@ -45,13 +44,6 @@ export async function POST(req: Request) {
     shiftStart.setHours(SHIFT_HOUR, 0, 0, 0);
     const status = now <= shiftStart ? "On Time" : "Late";
 
-    // Client IP
-    const headersList = await headers();
-    const ip =
-      headersList.get("x-forwarded-for")?.split(",")[0] ||
-      headersList.get("x-real-ip") ||
-      "Unknown";
-
     // Directories and CSV
     const dataDir = path.join(process.cwd(), "data");
     const uploadsDir = path.join(process.cwd(), "uploads");
@@ -60,8 +52,9 @@ export async function POST(req: Request) {
     fs.mkdirSync(dataDir, { recursive: true });
     fs.mkdirSync(uploadsDir, { recursive: true });
 
+    // ✅ Updated CSV header without IP
     if (!fs.existsSync(csvPath)) {
-      fs.writeFileSync(csvPath, "Name,Email,Date,Time In,Status,IP\n");
+      fs.writeFileSync(csvPath, "Name,Email,Date,Time In,Status\n");
     }
 
     // Prevent duplicate time-in
@@ -79,8 +72,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Already timed in today" }, { status: 409 });
     }
 
-    // Append to CSV
-    const row = `"${name}","${normalizedEmail}","${date}","${timeIn}","${status}","${ip}"\n`;
+    // ✅ Append to CSV without IP
+    const row = `"${name}","${normalizedEmail}","${date}","${timeIn}","${status}"\n`;
     fs.appendFileSync(csvPath, row);
 
     // Save uploaded image

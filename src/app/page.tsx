@@ -1,9 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Button } from "../components/ui/button";
-import { Pointer } from "lucide-react";
-// If using shadcn later:
-// import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const [name, setName] = useState("");
@@ -31,54 +28,56 @@ export default function Home() {
 
   const formattedDate = currentTime.toLocaleDateString("en-US", {
     weekday: "long",
-    year: "numeric",
     month: "short",
-    day: "numeric"
+    day: "numeric",
+    year: "numeric"
   });
 
- const timeIn = async () => {
-  if (!name || !email) {
-    alert("Please enter your name and email");
-    return;
-  }
-
-  setLoading(true);
-
-  try {
-    const formData = new FormData();
-    formData.append("name", name);
-    formData.append("email", email);
-
-    if (attachment) {
-      formData.append("attachment", attachment);
-    }
-
-    // ✅ Use environment variable
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-    const res = await fetch(`${basePath}/api/time-in`, {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      alert(data.message);
+  const timeIn = async () => {
+    // ✅ Validation: Check name, email, and image
+    if (!name || !email) {
+      alert("Please enter your name and email");
       return;
     }
 
-    setResult({
-      status: data.status,
-      timeIn: data.timeIn,
-      date: data.date,
-    });
-  } catch (err) {
-    alert("Something went wrong. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
+    if (!attachment) {
+      alert("Please attach an image");
+      return;
+    }
 
+    setLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("name", name);
+      formData.append("email", email);
+      formData.append("attachment", attachment);
+
+      // ✅ Use environment variable
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      const res = await fetch(`${basePath}/api/time-in`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.message);
+        return;
+      }
+
+      setResult({
+        status: data.status,
+        timeIn: data.timeIn,
+        date: data.date,
+      });
+    } catch (err) {
+      alert("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <main
@@ -87,129 +86,222 @@ export default function Home() {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        backgroundColor: "#e0e0e0"
+        backgroundColor: "#1a1a1a",
+        fontFamily: "system-ui, -apple-system, sans-serif"
       }}
     >
       <div
         style={{
-          width: 400,
-          padding: 30,
+          width: 420,
+          padding: 40,
           backgroundColor: "#ffffff",
-          borderRadius: 8,
-          boxShadow: "0 8px 20px rgba(0,0,0,0.1)"
+          borderRadius: 16,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.3)"
         }}
       >
-        {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 20
-          }}
-        >
-          <img src="/logo.png" alt="Company Logo" style={{ height: 40 }} />
-          <span style={{ fontWeight: "bold", fontSize: 18 }}>
+        {/* Header with Logo */}
+        <div style={{ textAlign: "center", marginBottom: 30 }}>
+          <h1 style={{ 
+            fontSize: 32, 
+            fontWeight: "bold", 
+            margin: 0,
+            marginBottom: 8,
+            color: "#000"
+          }}>
+            Wellevate
+          </h1>
+          <h2 style={{ 
+            fontSize: 18, 
+            fontWeight: "600", 
+            margin: 0,
+            marginBottom: 4,
+            color: "#000"
+          }}>
             WFH Time In
-          </span>
+          </h2>
+          <p style={{ 
+            fontSize: 13, 
+            color: "#666",
+            margin: 0
+          }}>
+            Enter your details below to clock in for the day
+          </p>
         </div>
 
         {/* Clock */}
-        <h1
-          style={{
-            fontSize: 55,
-            fontWeight: "bold",
-            margin: "10px 0",
-            textAlign: "center"
-          }}
-        >
-          {formattedTime}
-        </h1>
+        <div style={{ 
+          textAlign: "center", 
+          marginBottom: 30,
+          paddingBottom: 30,
+          borderBottom: "1px solid #e5e5e5"
+        }}>
+          <h1
+            style={{
+              fontSize: 48,
+              fontWeight: "bold",
+              margin: 0,
+              marginBottom: 4,
+              color: "#000",
+              letterSpacing: "-0.02em"
+            }}
+          >
+            {formattedTime}
+          </h1>
+          <p style={{ 
+            fontSize: 14, 
+            color: "#666", 
+            margin: 0 
+          }}>
+            {formattedDate}
+          </p>
+        </div>
 
-        {/* Date */}
-        <p style={{ textAlign: "center", color: "#555", marginBottom: 30 }}>
-          {formattedDate}
-        </p>
+        {/* Full Name Input */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ 
+            display: "block", 
+            fontWeight: "600", 
+            marginBottom: 8,
+            fontSize: 14,
+            color: "#000"
+          }}>
+            Full Name
+          </label>
+          <input
+            type="text"
+            placeholder="John Smith"
+            value={name}
+            disabled={!!result}
+            onChange={e => setName(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "12px 16px",
+              borderRadius: 8,
+              border: "1px solid #e5e5e5",
+              fontSize: 15,
+              boxSizing: "border-box",
+              backgroundColor: result ? "#f5f5f5" : "#fff",
+              color: "#000"
+            }}
+          />
+        </div>
 
-        {/* Inputs */}
-        <input
-          type="text"
-          placeholder="Name"
-          value={name}
-          disabled={!!result}
-          onChange={e => setName(e.target.value)}
-          style={{
-            width: "100%",
-            padding: 12,
-            marginBottom: 15,
-            borderRadius: 6,
-            border: "1px solid #ccc",
-            fontSize: 16
-          }}
-        />
+        {/* Email Address Input */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ 
+            display: "block", 
+            fontWeight: "600", 
+            marginBottom: 8,
+            fontSize: 14,
+            color: "#000"
+          }}>
+            Email Address
+          </label>
+          <input
+            type="email"
+            placeholder="email@example.com"
+            value={email}
+            disabled={!!result}
+            onChange={e => setEmail(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "12px 16px",
+              borderRadius: 8,
+              border: "1px solid #e5e5e5",
+              fontSize: 15,
+              boxSizing: "border-box",
+              backgroundColor: result ? "#f5f5f5" : "#fff",
+              color: "#000"
+            }}
+          />
+        </div>
 
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          disabled={!!result}
-          onChange={e => setEmail(e.target.value)}
-          style={{
-            width: "100%",
-            padding: 12,
-            marginBottom: 25,
-            borderRadius: 6,
-            border: "1px solid #ccc",
-            fontSize: 16
-          }}
-        />
+        {/* Attach Image */}
+        <div style={{ marginBottom: 25 }}>
+          <label style={{ 
+            display: "block", 
+            fontWeight: "600", 
+            marginBottom: 8,
+            fontSize: 14,
+            color: "#000"
+          }}>
+            Attach Image
+          </label>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            disabled={!!result}
+            onChange={(e) => setAttachment(e.target.files?.[0] || null)}
+            style={{ 
+              width: "100%", 
+              fontSize: 14,
+              padding: "10px 16px",
+              border: "1px solid #e5e5e5",
+              borderRadius: 8,
+              boxSizing: "border-box",
+              backgroundColor: result ? "#f5f5f5" : "#fff",
+              cursor: result ? "not-allowed" : "pointer"
+            }}
+          />
+          <p style={{ 
+            fontSize: 12, 
+            color: "#999", 
+            marginTop: 6,
+            marginBottom: 0 
+          }}>
+            JPG, PNG, or WEBP • Max 5MB
+          </p>
+        </div>
 
-         <input
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          disabled={!!result}
-          onChange={(e) => setAttachment(e.target.files?.[0] || null)}
-          style={{ width: "100%", marginBottom: 5 }}
-        />
-
-        <p style={{ fontSize: 12, color: "#666", marginBottom: 15 }}>
-          Image only (JPG, PNG, WEBP) – max 5MB
-        </p>
-
-        {/* Button */}
-        <Button
+        {/* Time In Button */}
+        <button
           onClick={timeIn}
           disabled={loading || !!result}
           style={{
             width: "100%",
-            padding: 14,
-            backgroundColor: loading || result ? "#9ca3af" : "#2563eb",
+            padding: 16,
+            backgroundColor: loading || result ? "#666" : "#000",
             color: "white",
             border: "none",
-            borderRadius: 6,
-            fontSize: 18,
-            cursor: loading || result ? "not-allowed" : "pointer"
+            borderRadius: 8,
+            fontSize: 16,
+            fontWeight: "600",
+            cursor: loading || result ? "not-allowed" : "pointer",
+            transition: "all 0.2s",
+            opacity: loading || result ? 0.6 : 1
           }}
         >
           {loading ? "Recording..." : result ? "Time In Recorded" : "Time In"}
-        </Button>
+        </button>
 
         {/* Result */}
         {result && (
           <div
             style={{
               marginTop: 20,
-              padding: 15,
-              borderRadius: 6,
-              backgroundColor:
-                result.status === "On Time" ? "#dcfce7" : "#fee2e2",
-              color: result.status === "On Time" ? "#166534" : "#991b1b",
+              padding: 16,
+              borderRadius: 8,
+              backgroundColor: result.status === "On Time" ? "#dcfce7" : "#fee2e2",
+              border: `1px solid ${result.status === "On Time" ? "#86efac" : "#fca5a5"}`,
               textAlign: "center"
             }}
           >
-            <strong>{result.status}</strong>
-            <br />
-            {result.timeIn} • {result.date}
+            <p style={{
+              margin: 0,
+              fontSize: 15,
+              fontWeight: "600",
+              color: result.status === "On Time" ? "#166534" : "#991b1b"
+            }}>
+              {result.status}
+            </p>
+            <p style={{
+              margin: "4px 0 0 0",
+              fontSize: 13,
+              color: result.status === "On Time" ? "#166534" : "#991b1b",
+              opacity: 0.8
+            }}>
+              {result.timeIn} • {result.date}
+            </p>
           </div>
         )}
       </div>
