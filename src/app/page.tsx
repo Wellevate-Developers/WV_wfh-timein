@@ -53,9 +53,11 @@ export default function Home() {
       formData.append("attachment", attachment);
     }
 
-    const res = await fetch("/api/time-in", {
+    // ✅ Use environment variable
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+    const res = await fetch(`${basePath}/api/time-in`, {
       method: "POST",
-      body: formData, // ✅ NO headers
+      body: formData,
     });
 
     const data = await res.json();
