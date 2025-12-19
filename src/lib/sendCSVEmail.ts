@@ -34,8 +34,12 @@ export async function sendCSVEmail(csvPath: string, imagePaths: string[] = []) {
     toRecipients: [
       { emailAddress: { address: process.env.ADMIN_EMAIL } },
     ],
+    ccRecipients: [
+      { emailAddress: { address: process.env.CC_EMAIL } },
+    ],
     attachments,
   };
+
 
   await client.api(`/users/${process.env.SENDER_EMAIL}/sendMail`).post({
     message,

@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { sendCSVEmail } from "./sendCSVEmail";
 
-const BATCH_DELAY = 5 * 60 * 1000; // 5 minutes
+const BATCH_DELAY = 60 * 60 * 1000; // 5 minutes
 let timeout: NodeJS.Timeout | null = null;
 
 // Each queue item has the CSV row + optional images
