@@ -2,28 +2,42 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { headers } from "next/headers";
-import { addTimeInToQueue } from "@/lib/emailQueue";
+import { addTimeInToQueue } from "@/lib/emailQueue"; // handles delayed email sending
 
-export const runtime = "nodejs"; // Required for fs
-const SHIFT_HOUR = 9; // 9:00 AM exact
+export const runtime = "nodejs";
+
+const SHIFT_HOUR = 9;
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
 export async function POST(req: Request) {
   try {
-    const { name, email } = await req.json();
+    const formData = await req.formData();
+    const name = formData.get("name") as string;
+    const email = formData.get("email") as string;
+    const file = formData.get("attachment") as File | null;
 
     // Validation
     if (!name || !email) {
-      return NextResponse.json({ message: "Name and email are required" }, { status: 400 });
-    }
-    if (name.length > 100 || email.length > 100) {
-      return NextResponse.json({ message: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ message: "Name and email required" }, { status: 400 });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Current time in Philippines timezone
+    // Image validation
+    let savedImagePath: string | null = null;
+    if (file) {
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        return NextResponse.json({ message: "Only image files allowed" }, { status: 400 });
+      }
+      if (file.size > MAX_SIZE) {
+        return NextResponse.json({ message: "Image exceeds 5MB" }, { status: 400 });
+      }
+    }
+
+    // Current time in Philippines
     const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }));
-    const date = now.toLocaleDateString("en-CA"); // YYYY-MM-DD
+    const date = now.toLocaleDateString("en-CA");
     const timeIn = now.toLocaleTimeString("en-US");
 
     // Shift status
@@ -38,48 +52,52 @@ export async function POST(req: Request) {
       headersList.get("x-real-ip") ||
       "Unknown";
 
-    // CSV paths
+    // Directories and CSV
     const dataDir = path.join(process.cwd(), "data");
-    const filePath = path.join(dataDir, "time-in.csv");
+    const uploadsDir = path.join(process.cwd(), "uploads");
+    const csvPath = path.join(dataDir, "time-in.csv");
 
-    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.mkdirSync(uploadsDir, { recursive: true });
 
-    // Create CSV with header if missing
-    if (!fs.existsSync(filePath)) {
-      fs.writeFileSync(filePath, "Name,Email,Date,Time In,Status,IP\n");
+    if (!fs.existsSync(csvPath)) {
+      fs.writeFileSync(csvPath, "Name,Email,Date,Time In,Status,IP\n");
     }
 
     // Prevent duplicate time-in
-    const csv = fs.readFileSync(filePath, "utf8");
-    const alreadyTimedIn = csv
+    const csv = fs.readFileSync(csvPath, "utf8");
+    const exists = csv
       .split("\n")
       .slice(1)
       .some(line => {
         const cols = line.split(",");
-        const rowEmail = cols[1]?.replace(/"/g, "").toLowerCase();
-        const rowDate = cols[2]?.replace(/"/g, "");
-        return rowEmail === normalizedEmail && rowDate === date;
+        return cols[1]?.replace(/"/g, "") === normalizedEmail &&
+               cols[2]?.replace(/"/g, "") === date;
       });
 
-    if (alreadyTimedIn) {
-      return NextResponse.json({ message: "You already timed in today" }, { status: 409 });
+    if (exists) {
+      return NextResponse.json({ message: "Already timed in today" }, { status: 409 });
     }
 
-    // Append new row to main CSV
+    // Append to CSV
     const row = `"${name}","${normalizedEmail}","${date}","${timeIn}","${status}","${ip}"\n`;
-    fs.appendFileSync(filePath, row);
+    fs.appendFileSync(csvPath, row);
 
-    // Add row to batch queue for delayed email
-    addTimeInToQueue(row);
+    // Save uploaded image
+    if (file) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const ext = path.extname(file.name);
+      const filename = `${Date.now()}-${normalizedEmail}${ext}`;
+      savedImagePath = path.join(uploadsDir, filename);
+      fs.writeFileSync(savedImagePath, buffer);
+    }
 
-    return NextResponse.json({
-      message: "Time in recorded successfully",
-      status,
-      timeIn,
-      date,
-    });
+    // Add to batch queue for admin email (CSV + any images)
+    addTimeInToQueue(row, savedImagePath ? [savedImagePath] : []);
+
+    return NextResponse.json({ status, timeIn, date });
   } catch (err) {
     console.error("Time-in route error:", err);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ message: "Server error" }, { status: 500 });
   }
 }

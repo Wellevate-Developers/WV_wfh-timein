@@ -1,11 +1,14 @@
 "use client";
 import { useState, useEffect } from "react";
+import { Button } from "../components/ui/button";
+import { Pointer } from "lucide-react";
 // If using shadcn later:
 // import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<null | {
@@ -33,40 +36,47 @@ export default function Home() {
     day: "numeric"
   });
 
-  const timeIn = async () => {
-    if (!name || !email) {
-      alert("Please enter your name and email");
+ const timeIn = async () => {
+  if (!name || !email) {
+    alert("Please enter your name and email");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("email", email);
+
+    if (attachment) {
+      formData.append("attachment", attachment);
+    }
+
+    const res = await fetch("/api/time-in", {
+      method: "POST",
+      body: formData, // ✅ NO headers
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.message);
       return;
     }
 
-    setLoading(true);
+    setResult({
+      status: data.status,
+      timeIn: data.timeIn,
+      date: data.date,
+    });
+  } catch (err) {
+    alert("Something went wrong. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
 
-    try {
-      const res = await fetch("/api/time-in", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email })
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.message);
-        setLoading(false);
-        return;
-      }
-
-      setResult({
-        status: data.status,
-        timeIn: data.timeIn,
-        date: data.date
-      });
-    } catch (err) {
-      alert("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <main
@@ -152,15 +162,27 @@ export default function Home() {
           }}
         />
 
+         <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          disabled={!!result}
+          onChange={(e) => setAttachment(e.target.files?.[0] || null)}
+          style={{ width: "100%", marginBottom: 5 }}
+        />
+
+        <p style={{ fontSize: 12, color: "#666", marginBottom: 15 }}>
+          Image only (JPG, PNG, WEBP) – max 5MB
+        </p>
+
         {/* Button */}
-        <button
+        <Button
           onClick={timeIn}
           disabled={loading || !!result}
           style={{
             width: "100%",
             padding: 14,
             backgroundColor: loading || result ? "#9ca3af" : "#2563eb",
-            color: "#fff",
+            color: "white",
             border: "none",
             borderRadius: 6,
             fontSize: 18,
@@ -168,7 +190,7 @@ export default function Home() {
           }}
         >
           {loading ? "Recording..." : result ? "Time In Recorded" : "Time In"}
-        </button>
+        </Button>
 
         {/* Result */}
         {result && (
