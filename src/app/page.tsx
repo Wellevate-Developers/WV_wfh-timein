@@ -1,11 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
-import { Button } from "../components/ui/button";
+import { useState, useEffect, useRef } from "react";
+import * as htmlToImage from "html-to-image";
 
 export default function Home() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [attachment, setAttachment] = useState<File | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<null | {
@@ -14,6 +13,9 @@ export default function Home() {
     date: string;
   }>(null);
 
+  const formRef = useRef<HTMLDivElement>(null);
+
+  // Update clock every second
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
@@ -33,31 +35,50 @@ export default function Home() {
     year: "numeric"
   });
 
-  const timeIn = async () => {
-    // ✅ Validation: Check name, email, and image
-    if (!name || !email) {
-      alert("Please enter your name and email");
-      return;
+  // Capture form as image
+  const captureFormAsImage = async (): Promise<File> => {
+    if (!formRef.current) {
+      throw new Error("Form not found");
     }
 
-    if (!attachment) {
-      alert("Please attach an image");
+    const blob = await htmlToImage.toBlob(formRef.current, {
+      pixelRatio: 2,
+      backgroundColor: "#ffffff"
+    });
+
+    if (!blob) {
+      throw new Error("Failed to capture form");
+    }
+
+    return new File(
+      [blob],
+      `timein-form-${Date.now()}.png`,
+      { type: "image/png" }
+    );
+  };
+
+  // Time In function
+  const timeIn = async () => {
+    if (!name || !email) {
+      alert("Please enter your name and email");
       return;
     }
 
     setLoading(true);
 
     try {
+      // Capture the form only
+      const screenshot = await captureFormAsImage();
+
       const formData = new FormData();
       formData.append("name", name);
       formData.append("email", email);
-      formData.append("attachment", attachment);
+      formData.append("attachment", screenshot);
 
-      // ✅ Use environment variable
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
       const res = await fetch(`${basePath}/api/time-in`, {
         method: "POST",
-        body: formData,
+        body: formData
       });
 
       const data = await res.json();
@@ -70,10 +91,12 @@ export default function Home() {
       setResult({
         status: data.status,
         timeIn: data.timeIn,
-        date: data.date,
+        date: data.date
       });
+
     } catch (err) {
-      alert("Something went wrong. Please try again.");
+      console.error(err);
+      alert("Failed to capture form.");
     } finally {
       setLoading(false);
     }
@@ -91,6 +114,7 @@ export default function Home() {
       }}
     >
       <div
+        ref={formRef}
         style={{
           width: 420,
           padding: 40,
@@ -99,72 +123,30 @@ export default function Home() {
           boxShadow: "0 20px 60px rgba(0,0,0,0.3)"
         }}
       >
-        {/* Header with Logo */}
+        {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 30 }}>
-          <h1 style={{ 
-            fontSize: 32, 
-            fontWeight: "bold", 
-            margin: 0,
-            marginBottom: 8,
-            color: "#000"
-          }}>
+          <h1 style={{ fontSize: 32, fontWeight: "bold", margin: 0, marginBottom: 8, color: "#000" }}>
             Wellevate
           </h1>
-          <h2 style={{ 
-            fontSize: 18, 
-            fontWeight: "600", 
-            margin: 0,
-            marginBottom: 4,
-            color: "#000"
-          }}>
+          <h2 style={{ fontSize: 18, fontWeight: "600", margin: 0, marginBottom: 4, color: "#000" }}>
             WFH Time In
           </h2>
-          <p style={{ 
-            fontSize: 13, 
-            color: "#666",
-            margin: 0
-          }}>
+          <p style={{ fontSize: 13, color: "#666", margin: 0 }}>
             Enter your details below to clock in for the day
           </p>
         </div>
 
         {/* Clock */}
-        <div style={{ 
-          textAlign: "center", 
-          marginBottom: 30,
-          paddingBottom: 30,
-          borderBottom: "1px solid #e5e5e5"
-        }}>
-          <h1
-            style={{
-              fontSize: 48,
-              fontWeight: "bold",
-              margin: 0,
-              marginBottom: 4,
-              color: "#000",
-              letterSpacing: "-0.02em"
-            }}
-          >
+        <div style={{ textAlign: "center", marginBottom: 30, paddingBottom: 30, borderBottom: "1px solid #e5e5e5" }}>
+          <h1 style={{ fontSize: 48, fontWeight: "bold", margin: 0, marginBottom: 4, color: "#000", letterSpacing: "-0.02em" }}>
             {formattedTime}
           </h1>
-          <p style={{ 
-            fontSize: 14, 
-            color: "#666", 
-            margin: 0 
-          }}>
-            {formattedDate}
-          </p>
+          <p style={{ fontSize: 14, color: "#666", margin: 0 }}>{formattedDate}</p>
         </div>
 
         {/* Full Name Input */}
         <div style={{ marginBottom: 20 }}>
-          <label style={{ 
-            display: "block", 
-            fontWeight: "600", 
-            marginBottom: 8,
-            fontSize: 14,
-            color: "#000"
-          }}>
+          <label style={{ display: "block", fontWeight: "600", marginBottom: 8, fontSize: 14, color: "#000" }}>
             Full Name
           </label>
           <input
@@ -188,13 +170,7 @@ export default function Home() {
 
         {/* Email Address Input */}
         <div style={{ marginBottom: 20 }}>
-          <label style={{ 
-            display: "block", 
-            fontWeight: "600", 
-            marginBottom: 8,
-            fontSize: 14,
-            color: "#000"
-          }}>
+          <label style={{ display: "block", fontWeight: "600", marginBottom: 8, fontSize: 14, color: "#000" }}>
             Email Address
           </label>
           <input
@@ -216,43 +192,6 @@ export default function Home() {
           />
         </div>
 
-        {/* Attach Image */}
-        <div style={{ marginBottom: 25 }}>
-          <label style={{ 
-            display: "block", 
-            fontWeight: "600", 
-            marginBottom: 8,
-            fontSize: 14,
-            color: "#000"
-          }}>
-            Attach Image
-          </label>
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            disabled={!!result}
-            onChange={(e) => setAttachment(e.target.files?.[0] || null)}
-            style={{ 
-              width: "100%", 
-              fontSize: 14,
-              padding: "10px 16px",
-              border: "1px solid #e5e5e5",
-              borderRadius: 8,
-              boxSizing: "border-box",
-              backgroundColor: result ? "#f5f5f5" : "#fff",
-              cursor: result ? "not-allowed" : "pointer"
-            }}
-          />
-          <p style={{ 
-            fontSize: 12, 
-            color: "#999", 
-            marginTop: 6,
-            marginBottom: 0 
-          }}>
-            JPG, PNG, or WEBP • Max 5MB
-          </p>
-        </div>
-
         {/* Time In Button */}
         <button
           onClick={timeIn}
@@ -271,7 +210,7 @@ export default function Home() {
             opacity: loading || result ? 0.6 : 1
           }}
         >
-          {loading ? "Recording..." : result ? "Time In Recorded" : "Time In"}
+          {loading ? "Capturing..." : result ? "Time In Recorded" : "Capture & Time In"}
         </button>
 
         {/* Result */}
