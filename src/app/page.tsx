@@ -12,31 +12,50 @@ export default function Home() {
 
   const formRef = useRef<HTMLDivElement>(null);
 
+  // disable right click
+  useEffect(() => {
+    const handleRightClick = (e: MouseEvent) => {
+      e.preventDefault(); // disables the right-click menu
+      alert("Right-click is disabled on this page."); // optional message
+    };
+
+    document.addEventListener("contextmenu", handleRightClick);
+
+    return () => {
+      document.removeEventListener("contextmenu", handleRightClick);
+    };
+  }, []);
+
+
   // Clock
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Detect blocked devices (phones + iPads including iPad Pro A16)
+  // Detect blocked devices (phones, all Apple devices, iPad Pro A16)
   useEffect(() => {
     const ua = navigator.userAgent;
+    const platform = navigator.platform;
 
+    // Phones
     const mobileKeywords = ["Android", "iPhone", "iPod", "Opera Mini", "IEMobile", "Mobile"];
     const isPhone = mobileKeywords.some(k => ua.includes(k));
 
-    // Detect iPad (legacy and A16)
-    const isiPad =
-      ua.includes("iPad") || // legacy UA
-      (navigator.maxTouchPoints > 1 && window.innerWidth <= 1024); // modern iPads in desktop UA
+    // Detect iPad (legacy and modern)
+    const isiPad = ua.includes("iPad") || (navigator.maxTouchPoints > 1 && window.innerWidth <= 1024);
 
-    // Optionally, block specific iPad Pro A16 screen resolutions
+    // Specific iPad Pro A16 resolutions
     const isiPadProA16 =
       navigator.maxTouchPoints > 1 &&
-      ((screen.width === 2388 && screen.height === 1668) || // 11-inch iPad Pro
-       (screen.width === 2732 && screen.height === 2048));   // 12.9-inch iPad Pro
+      ((screen.width === 2388 && screen.height === 1668) || // 11-inch
+        (screen.width === 2732 && screen.height === 2048));  // 12.9-inch
 
-    if (isPhone || isiPad || isiPadProA16) {
+    // Block all Apple devices (iPhone, iPad, iPod, Mac)
+    const appleKeywords = ["iPhone", "iPad", "iPod", "Macintosh", "MacIntel", "MacPPC", "Mac68K"];
+    const isAppleDevice = appleKeywords.some(k => ua.includes(k) || platform.includes(k));
+
+    if (isPhone || isiPad || isiPadProA16 || isAppleDevice) {
       setIsBlockedDevice(true);
     }
   }, []);
@@ -66,7 +85,7 @@ export default function Home() {
   // Time In
   const timeIn = async () => {
     if (isBlockedDevice) {
-      alert("Time In is not allowed on phones or tablets, including iPads.");
+      alert("Time In is not allowed on Apple devices or mobile phones.");
       return;
     }
 
@@ -105,6 +124,7 @@ export default function Home() {
   return (
     <main style={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", backgroundColor: "#1a1a1a", fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div ref={formRef} style={{ width: 420, padding: 40, backgroundColor: "#ffffff", borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 30 }}>
           <h1 style={{ fontSize: 32, fontWeight: "bold", margin: 0, marginBottom: 8, color: "#000" }}>Wellevate</h1>
@@ -132,7 +152,7 @@ export default function Home() {
 
         {/* Time In Button */}
         <button onClick={timeIn} disabled={loading || !!result || isBlockedDevice} style={{ width: "100%", padding: 16, backgroundColor: loading || result || isBlockedDevice ? "#666" : "#000", color: "white", border: "none", borderRadius: 8, fontSize: 16, fontWeight: "600", cursor: loading || result || isBlockedDevice ? "not-allowed" : "pointer", transition: "all 0.2s", opacity: loading || result || isBlockedDevice ? 0.6 : 1 }}>
-          {isBlockedDevice ? "Time In unavailable on phones/iPads" : loading ? "Capturing..." : result ? "Time In Recorded" : "Capture & Time In"}
+          {isBlockedDevice ? "Time In unavailable on Apple devices or phones" : loading ? "Capturing..." : result ? "Time In Recorded" : "Capture & Time In"}
         </button>
 
         {/* Result */}
