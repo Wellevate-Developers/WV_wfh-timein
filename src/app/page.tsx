@@ -14,16 +14,22 @@ export default function Home() {
   }>(null);
 
   const formRef = useRef<HTMLDivElement>(null);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobileOrTablet, setIsMobileOrTablet] = useState(false);
 
   useEffect(() => {
     const ua = navigator.userAgent;
-    const mobileKeywords = ["Android", "iPhone", "iPad", "iPod", "Opera Mini", "IEMobile", "Mobile"];
 
-    const isMobileDevice = mobileKeywords.some(keyword => ua.includes(keyword)) || window.innerWidth < 768;
+    // Phones
+    const mobileKeywords = ["Android", "iPhone", "iPod", "Opera Mini", "IEMobile", "Mobile"];
 
-    setIsMobile(isMobileDevice);
+    // iPads can report desktop UA; detect touch + screen width < 1024
+    const isiPad = (ua.includes("iPad") || (navigator.maxTouchPoints > 1 && window.innerWidth <= 1024));
+
+    const isMobileDevice = mobileKeywords.some(k => ua.includes(k)) || isiPad;
+
+    setIsMobileOrTablet(isMobileDevice);
   }, []);
+
 
   // Update clock every second
   useEffect(() => {
@@ -205,24 +211,23 @@ export default function Home() {
         {/* Time In Button */}
         <button
           onClick={timeIn}
-          disabled={loading || !!result || isMobile}
+          disabled={loading || !!result || isMobileOrTablet}
           style={{
             width: "100%",
             padding: 16,
-            backgroundColor: loading || result || isMobile ? "#666" : "#000",
+            backgroundColor: loading || result || isMobileOrTablet ? "#666" : "#000",
             color: "white",
             border: "none",
             borderRadius: 8,
             fontSize: 16,
             fontWeight: "600",
-            cursor: loading || result || isMobile ? "not-allowed" : "pointer",
+            cursor: loading || result || isMobileOrTablet ? "not-allowed" : "pointer",
             transition: "all 0.2s",
-            opacity: loading || result || isMobile ? 0.6 : 1
+            opacity: loading || result || isMobileOrTablet ? 0.6 : 1
           }}
         >
-          {isMobile ? "Time In unavailable on mobile" : loading ? "Capturing..." : result ? "Time In Recorded" : "Capture & Time In"}
+          {isMobileOrTablet ? "Time In unavailable on mobile/tablet" : loading ? "Capturing..." : result ? "Time In Recorded" : "Capture & Time In"}
         </button>
-
 
         {/* Result */}
         {result && (
