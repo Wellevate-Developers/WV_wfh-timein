@@ -14,6 +14,16 @@ export default function Home() {
   }>(null);
 
   const formRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    const mobileKeywords = ["Android", "iPhone", "iPad", "iPod", "Opera Mini", "IEMobile", "Mobile"];
+
+    const isMobileDevice = mobileKeywords.some(keyword => ua.includes(keyword)) || window.innerWidth < 768;
+
+    setIsMobile(isMobileDevice);
+  }, []);
 
   // Update clock every second
   useEffect(() => {
@@ -195,23 +205,24 @@ export default function Home() {
         {/* Time In Button */}
         <button
           onClick={timeIn}
-          disabled={loading || !!result}
+          disabled={loading || !!result || isMobile}
           style={{
             width: "100%",
             padding: 16,
-            backgroundColor: loading || result ? "#666" : "#000",
+            backgroundColor: loading || result || isMobile ? "#666" : "#000",
             color: "white",
             border: "none",
             borderRadius: 8,
             fontSize: 16,
             fontWeight: "600",
-            cursor: loading || result ? "not-allowed" : "pointer",
+            cursor: loading || result || isMobile ? "not-allowed" : "pointer",
             transition: "all 0.2s",
-            opacity: loading || result ? 0.6 : 1
+            opacity: loading || result || isMobile ? 0.6 : 1
           }}
         >
-          {loading ? "Capturing..." : result ? "Time In Recorded" : "Capture & Time In"}
+          {isMobile ? "Time In unavailable on mobile" : loading ? "Capturing..." : result ? "Time In Recorded" : "Capture & Time In"}
         </button>
+
 
         {/* Result */}
         {result && (
