@@ -27,11 +27,21 @@ export default function Home() {
   }, []);
 
 
-  // Clock
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  // Clock (Manila Time)
+useEffect(() => {
+  const tick = () => {
+    const manilaNow = new Date(
+      new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })
+    );
+    setCurrentTime(manilaNow);
+  };
+
+  tick(); // run immediately
+  const timer = setInterval(tick, 1000);
+
+  return () => clearInterval(timer);
+}, []);
+
 
   // Detect blocked devices (phones, all Apple devices, iPad Pro A16)
   useEffect(() => {
@@ -152,7 +162,7 @@ export default function Home() {
 
         {/* Time In Button */}
         <button onClick={timeIn} disabled={loading || !!result || isBlockedDevice} style={{ width: "100%", padding: 16, backgroundColor: loading || result || isBlockedDevice ? "#666" : "#000", color: "white", border: "none", borderRadius: 8, fontSize: 16, fontWeight: "600", cursor: loading || result || isBlockedDevice ? "not-allowed" : "pointer", transition: "all 0.2s", opacity: loading || result || isBlockedDevice ? 0.6 : 1 }}>
-          {isBlockedDevice ? "Time In unavailable on Apple devices or phones" : loading ? "Capturing..." : result ? "Time In Recorded" : "Capture & Time In"}
+          {isBlockedDevice ? "Time In unavailable on phones" : loading ? "Capturing..." : result ? "Time In Recorded" : "Capture & Time In"}
         </button>
 
         {/* Result */}

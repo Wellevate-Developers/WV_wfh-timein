@@ -2,45 +2,71 @@ import fs from "fs";
 import path from "path";
 import { sendCSVEmail } from "./sendCSVEmail";
 
+/* =======================
+   Configuration
+======================= */
+
 const MAX_BATCH_SIZE = 10;
+const MAX_QUEUE_SIZE = 100; // 🛑 HARD LIMIT
 const BATCH_DELAY = 5 * 60 * 1000; // 5 minutes
 
 let timeout: NodeJS.Timeout | null = null;
 
 type QueueItem = {
   row: string;
-  images?: string[];
+  images: string[];
 };
 
 const pendingTimeIns: QueueItem[] = [];
 
-/**
- * Add time-in entry
- */
-export function addTimeInToQueue(row: string, images: string[] = []) {
-  pendingTimeIns.push({ row, images });
+/* =======================
+   Safe logger
+======================= */
 
-  console.log(`📥 Queued (${pendingTimeIns.length}/${MAX_BATCH_SIZE})`);
-
-  // 🚀 Send immediately if batch is full
-  if (pendingTimeIns.length >= MAX_BATCH_SIZE) {
-    flushQueue();
-    return;
-  }
-
-  // ⏱️ Start delay timer only once
-  if (!timeout) {
-    timeout = setTimeout(flushQueue, BATCH_DELAY);
+function logError(message: string, err?: unknown) {
+  if (process.env.NODE_ENV !== "production") {
+    console.error(message, err);
+  } else {
+    console.error(message);
   }
 }
 
-/**
- * Send CSV + images and cleanup
- */
+/* =======================
+   Public API
+======================= */
+
+export function addTimeInToQueue(row: string, images: string[] = []) {
+  if (pendingTimeIns.length >= MAX_QUEUE_SIZE) {
+    throw new Error("Email queue full");
+  }
+
+  pendingTimeIns.push({ row, images });
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`📥 Queued (${pendingTimeIns.length}/${MAX_BATCH_SIZE})`);
+  }
+
+  // 🚀 Flush immediately if batch full
+  if (pendingTimeIns.length >= MAX_BATCH_SIZE) {
+    void flushQueue();
+    return;
+  }
+
+  // ⏱️ Start delay timer once
+  if (!timeout) {
+    timeout = setTimeout(() => {
+      void flushQueue();
+    }, BATCH_DELAY);
+  }
+}
+
+/* =======================
+   Internal worker
+======================= */
+
 async function flushQueue() {
   if (pendingTimeIns.length === 0) return;
 
-  // Stop timer to avoid double send
   if (timeout) {
     clearTimeout(timeout);
     timeout = null;
@@ -52,23 +78,17 @@ async function flushQueue() {
   const mainCSV = path.join(dataDir, "time-in.csv");
 
   try {
-    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.mkdirSync(uploadsDir, { recursive: true });
 
-    // Write CSV header
     fs.writeFileSync(batchFile, "Name,Email,Date,Time In,Status\n");
+    fs.appendFileSync(batchFile, pendingTimeIns.map(i => i.row).join(""));
 
-    // Write rows
-    const rows = pendingTimeIns.map(i => i.row).join("");
-    fs.appendFileSync(batchFile, rows);
+    const images = pendingTimeIns.flatMap(i => i.images);
 
-    // Collect images
-    const images = pendingTimeIns.flatMap(i => i.images || []);
-
-    // Send email
     await sendCSVEmail(batchFile, images);
 
-    // 🧹 Cleanup files
+    // 🧹 Cleanup
     if (fs.existsSync(batchFile)) fs.unlinkSync(batchFile);
     if (fs.existsSync(mainCSV)) fs.unlinkSync(mainCSV);
 
@@ -76,11 +96,9 @@ async function flushQueue() {
       if (fs.existsSync(img)) fs.unlinkSync(img);
     });
 
-    console.log(`✅ Sent ${pendingTimeIns.length} time-ins`);
-
     pendingTimeIns.length = 0;
   } catch (err) {
-    console.error("❌ Batch send failed:", err);
-    // Queue + files stay for retry
+    logError("Batch email send failed", err);
+    // Queue remains for retry
   }
 }
