@@ -40,10 +40,19 @@ export function addTimeInToQueue(row: string, images: string[] = []) {
     throw new Error("Email queue full");
   }
 
+  // Parse name & time from CSV row for logging
+  const match = row.match(/^"([^"]+)","([^"]+)","([^"]+)","([^"]+)","([^"]+)"/);
+  const name = match ? match[1] : "Unknown";
+  const date = match ? match[3] : "Unknown";
+  const time = match ? match[4] : "Unknown";
+
   pendingTimeIns.push({ row, images });
 
+  // ✅ Detailed log
   if (process.env.NODE_ENV !== "production") {
-    console.log(`📥 Queued (${pendingTimeIns.length}/${MAX_BATCH_SIZE})`);
+    console.log(
+      `📥 Queued (${pendingTimeIns.length}/${MAX_BATCH_SIZE}) - ${name} at ${time} on ${date}`
+    );
   }
 
   // 🚀 Flush immediately if batch full
@@ -59,6 +68,7 @@ export function addTimeInToQueue(row: string, images: string[] = []) {
     }, BATCH_DELAY);
   }
 }
+
 
 /* =======================
    Internal worker
