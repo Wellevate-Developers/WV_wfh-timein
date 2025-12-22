@@ -2,10 +2,11 @@ import fs from "fs";
 import path from "path";
 import { sendCSVEmail } from "./sendCSVEmail";
 
-const BATCH_DELAY = 60 * 60 * 1000; // 5 minutes
+const MAX_BATCH_SIZE = 10;
+const BATCH_DELAY = 5 * 60 * 1000; // 5 minutes
+
 let timeout: NodeJS.Timeout | null = null;
 
-// Each queue item has the CSV row + optional images
 type QueueItem = {
   row: string;
   images?: string[];
@@ -13,109 +14,73 @@ type QueueItem = {
 
 const pendingTimeIns: QueueItem[] = [];
 
+/**
+ * Add time-in entry
+ */
 export function addTimeInToQueue(row: string, images: string[] = []) {
   pendingTimeIns.push({ row, images });
 
+  console.log(`📥 Queued (${pendingTimeIns.length}/${MAX_BATCH_SIZE})`);
+
+  // 🚀 Send immediately if batch is full
+  if (pendingTimeIns.length >= MAX_BATCH_SIZE) {
+    flushQueue();
+    return;
+  }
+
+  // ⏱️ Start delay timer only once
   if (!timeout) {
-    timeout = setTimeout(async () => {
-      const dataDir = path.join(process.cwd(), "data");
-      const uploadsDir = path.join(process.cwd(), "uploads");
-      const batchFile = path.join(dataDir, "batch-time-in.csv");
-      const mainCSV = path.join(dataDir, "time-in.csv");
-
-      try {
-        if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-        if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
-        // ✅ Write header without IP
-        if (!fs.existsSync(batchFile)) {
-          fs.writeFileSync(batchFile, "Name,Email,Date,Time In,Status\n");
-        }
-
-        // Collect all rows
-        const allRows = pendingTimeIns.map(item => item.row).join("");
-        fs.appendFileSync(batchFile, allRows);
-
-        // Collect all image paths
-        const allImages: string[] = [];
-        pendingTimeIns.forEach(item => {
-          if (item.images) allImages.push(...item.images);
-        });
-
-        // Send CSV + images
-        await sendCSVEmail(batchFile, allImages);
-
-        // ✅ DELETE FILES AFTER SUCCESSFUL EMAIL SEND
-        
-        // Delete the batch CSV file
-        if (fs.existsSync(batchFile)) {
-          fs.unlinkSync(batchFile);
-          console.log(`✅ Deleted batch CSV: ${batchFile}`);
-        }
-
-        // Delete the main time-in.csv file
-        if (fs.existsSync(mainCSV)) {
-          fs.unlinkSync(mainCSV);
-          console.log(`✅ Deleted main CSV: ${mainCSV}`);
-        }
-
-        // Delete all uploaded images
-        allImages.forEach(imagePath => {
-          if (fs.existsSync(imagePath)) {
-            fs.unlinkSync(imagePath);
-            console.log(`✅ Deleted image: ${imagePath}`);
-          }
-        });
-
-        // Clear queue
-        pendingTimeIns.length = 0;
-        
-        console.log("✅ Email sent and all files cleaned up successfully");
-      } catch (err) {
-        console.error("❌ Failed to send batched CSV/email:", err);
-        // Don't delete files if email failed - keep them for retry/debugging
-      } finally {
-        timeout = null; // reset timer
-      }
-    }, BATCH_DELAY);
+    timeout = setTimeout(flushQueue, BATCH_DELAY);
   }
 }
 
-// Optional: cleanup function
-export function cleanupOldFiles() {
+/**
+ * Send CSV + images and cleanup
+ */
+async function flushQueue() {
+  if (pendingTimeIns.length === 0) return;
+
+  // Stop timer to avoid double send
+  if (timeout) {
+    clearTimeout(timeout);
+    timeout = null;
+  }
+
   const dataDir = path.join(process.cwd(), "data");
   const uploadsDir = path.join(process.cwd(), "uploads");
   const batchFile = path.join(dataDir, "batch-time-in.csv");
   const mainCSV = path.join(dataDir, "time-in.csv");
 
-  let cleanedCount = 0;
+  try {
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-  // Delete old batch CSV
-  if (fs.existsSync(batchFile)) {
-    fs.unlinkSync(batchFile);
-    cleanedCount++;
-    console.log("🧹 Cleaned up old batch CSV on startup");
-  }
+    // Write CSV header
+    fs.writeFileSync(batchFile, "Name,Email,Date,Time In,Status\n");
 
-  // Delete old main CSV
-  if (fs.existsSync(mainCSV)) {
-    fs.unlinkSync(mainCSV);
-    cleanedCount++;
-    console.log("🧹 Cleaned up old main CSV on startup");
-  }
+    // Write rows
+    const rows = pendingTimeIns.map(i => i.row).join("");
+    fs.appendFileSync(batchFile, rows);
 
-  // Delete all old images in uploads directory
-  if (fs.existsSync(uploadsDir)) {
-    const files = fs.readdirSync(uploadsDir);
-    files.forEach(file => {
-      const filePath = path.join(uploadsDir, file);
-      fs.unlinkSync(filePath);
-      cleanedCount++;
+    // Collect images
+    const images = pendingTimeIns.flatMap(i => i.images || []);
+
+    // Send email
+    await sendCSVEmail(batchFile, images);
+
+    // 🧹 Cleanup files
+    if (fs.existsSync(batchFile)) fs.unlinkSync(batchFile);
+    if (fs.existsSync(mainCSV)) fs.unlinkSync(mainCSV);
+
+    images.forEach(img => {
+      if (fs.existsSync(img)) fs.unlinkSync(img);
     });
-    console.log(`🧹 Cleaned up ${files.length} old image(s) on startup`);
-  }
 
-  if (cleanedCount > 0) {
-    console.log(`🧹 Total cleanup: ${cleanedCount} file(s) removed`);
+    console.log(`✅ Sent ${pendingTimeIns.length} time-ins`);
+
+    pendingTimeIns.length = 0;
+  } catch (err) {
+    console.error("❌ Batch send failed:", err);
+    // Queue + files stay for retry
   }
 }
