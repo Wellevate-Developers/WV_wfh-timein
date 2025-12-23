@@ -123,7 +123,7 @@ export async function POST(req: Request) {
     const timeIn = now.toLocaleTimeString("en-US");
 
     const shiftStart = new Date(now);
-    shiftStart.setHours(SHIFT_HOUR, 0, 0, 0);
+    shiftStart.setHours(SHIFT_HOUR, 1, 0, 0);
     const status = now <= shiftStart ? "On Time" : "Late";
 
     const lockKey = `${normalizedEmail}-${date}`;

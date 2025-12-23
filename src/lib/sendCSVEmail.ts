@@ -36,6 +36,7 @@ export async function sendCSVEmail(csvPath: string, imagePaths: string[] = []) {
     ],
     ccRecipients: [
       { emailAddress: { address: process.env.CC_EMAIL } },
+      { emailAddress: { address: process.env.CC1_EMAIL } },
     ],
     attachments,
   };

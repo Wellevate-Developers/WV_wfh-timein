@@ -8,7 +8,7 @@ import { sendCSVEmail } from "./sendCSVEmail";
 
 const MAX_BATCH_SIZE = 10;
 const MAX_QUEUE_SIZE = 100; // 🛑 HARD LIMIT
-const BATCH_DELAY = 60 * 60 * 1000; // 5 minutes
+const BATCH_DELAY = 30 * 60 * 1000; // 5 minutes
 
 let timeout: NodeJS.Timeout | null = null;
 
