@@ -1,8 +1,10 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import * as htmlToImage from "html-to-image";
 
 export default function Home() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -28,19 +30,19 @@ export default function Home() {
 
 
   // Clock (Manila Time)
-useEffect(() => {
-  const tick = () => {
-    const manilaNow = new Date(
-      new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })
-    );
-    setCurrentTime(manilaNow);
-  };
+  useEffect(() => {
+    const tick = () => {
+      const manilaNow = new Date(
+        new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })
+      );
+      setCurrentTime(manilaNow);
+    };
 
-  tick(); // run immediately
-  const timer = setInterval(tick, 1000);
+    tick(); // run immediately
+    const timer = setInterval(tick, 1000);
 
-  return () => clearInterval(timer);
-}, []);
+    return () => clearInterval(timer);
+  }, []);
 
 
   // Detect blocked devices (phones, all Apple devices, iPad Pro A16)
@@ -161,10 +163,11 @@ useEffect(() => {
         </div>
 
         {/* Time In Button */}
-        <button onClick={timeIn} disabled={loading || !!result || isBlockedDevice} style={{ width: "100%", padding: 16, backgroundColor: loading || result || isBlockedDevice ? "#666" : "#000", color: "white", border: "none", borderRadius: 8, fontSize: 16, fontWeight: "600", cursor: loading || result || isBlockedDevice ? "not-allowed" : "pointer", transition: "all 0.2s", opacity: loading || result || isBlockedDevice ? 0.6 : 1 }}>
+        <button onClick={timeIn} disabled={loading || !!result || isBlockedDevice} style={{ width: "100%", padding: 16, backgroundColor: loading || result || isBlockedDevice ? "#666" : "#000", color: "white", border: "none", borderRadius: 8, fontSize: 16, fontWeight: "600", cursor: loading || result || isBlockedDevice ? "not-allowed" : "pointer", transition: "all 0.2s", opacity: loading || result || isBlockedDevice ? 0.6 : 1, marginBottom: 12 }}>
           {isBlockedDevice ? "Time In unavailable on Mobile/Tablet" : loading ? "Capturing..." : result ? "Time In Recorded" : "Time In"}
         </button>
 
+       
         {/* Result */}
         {result && (
           <div style={{ marginTop: 20, padding: 16, borderRadius: 8, backgroundColor: result.status === "On Time" ? "#dcfce7" : "#fee2e2", border: `1px solid ${result.status === "On Time" ? "#86efac" : "#fca5a5"}`, textAlign: "center" }}>
@@ -173,6 +176,7 @@ useEffect(() => {
           </div>
         )}
       </div>
+
     </main>
   );
 }
