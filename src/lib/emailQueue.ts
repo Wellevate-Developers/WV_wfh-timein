@@ -55,6 +55,11 @@ export function addTimeInToQueue(row: string, images: string[] = []) {
     );
   }
 
+  console.log(
+    `📥 Queued (${pendingTimeIns.length}/${MAX_BATCH_SIZE}) - ${name} at ${time}`
+  );
+
+
   // 🚀 Flush immediately if batch full
   if (pendingTimeIns.length >= MAX_BATCH_SIZE) {
     void flushQueue();
