@@ -1,28 +1,23 @@
-// middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { isAllowedIp } from "@/lib/ip-utils";
 
-function getClientIp(req: NextRequest): string | null {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return req.headers.get("x-real-ip");
-}
+const ALLOWED_ORIGINS = [
+  "https://wellevate.ch",
+  "https://www.wellevate.ch",
+  "https://localhost:3000"
+];
 
 export function middleware(req: NextRequest) {
-  const ip = getClientIp(req);
+  const origin = req.headers.get("origin");
 
-  // Block if IP not in office network
-  if (!ip || !isAllowedIp(ip)) {
-    return new NextResponse("Access Denied", { status: 403 });
+  // Block cross-site requests
+  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+    return new NextResponse("Forbidden", { status: 403 });
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    "/wfh-timein/onsite-time-in/:path*",
-    "/api/time-in/:path*"
-  ]
+  matcher: ["/api/time-in"]
 };
