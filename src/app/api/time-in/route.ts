@@ -4,6 +4,7 @@ import path from "path";
 import crypto from "crypto";
 import { addTimeInToQueue } from "@/lib/emailQueue";
 import { validateEnvironment } from "@/lib/validateEnv";
+import { sendConfirmationEmail } from "@/lib/sendConfirmationEmail";
 
 validateEnvironment();
 
@@ -22,6 +23,7 @@ const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
 
 const EMAIL_REGEX =
   /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
+
 
 /* =======================
    Rate limiting
@@ -115,6 +117,20 @@ export async function POST(req: Request) {
 
     const normalizedEmail = email.toLowerCase();
 
+    // ✅ Blocked email check
+    const blockedEmails = (process.env.BLOCKED_EMAILS || "")
+      .split(",")
+      .map(e => e.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (blockedEmails.includes(normalizedEmail)) {
+      return NextResponse.json(
+        { message: "This email is not allowed to time in. Please contact your administrator." },
+        { status: 403 }
+      );
+    }
+
+
     const now = new Date(
       new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })
     );
@@ -188,6 +204,20 @@ export async function POST(req: Request) {
           { status: 503 }
         );
       }
+
+      try {
+        addTimeInToQueue(row, imagePath ? [imagePath] : []);
+      } catch {
+        return NextResponse.json(
+          { message: "System busy, please try again later" },
+          { status: 503 }
+        );
+      }
+
+      // ✅ Send confirmation email to the employee (non-blocking)
+      sendConfirmationEmail({ name, email: normalizedEmail, timeIn, date, status }).catch((err) => {
+        logError("Confirmation email failed", err);
+      });
 
       return NextResponse.json({ status, timeIn, date });
     } finally {
