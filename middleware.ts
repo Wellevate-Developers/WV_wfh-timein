@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const ALLOWED_ORIGINS = [
-  "https://wellevate.ch",
-  "https://www.wellevate.ch",
-  "https://localhost:3000"
+  "https://well-evate.com",
+  "https://www.well-evate.com",
+  "https://apps.well-evate.com",      // ← without www (most likely your real one)
+  "https://www.apps.well-evate.com",  // ← with www
+  "http://localhost:3000",
 ];
 
 export function middleware(req: NextRequest) {

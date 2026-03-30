@@ -2,11 +2,19 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import * as htmlToImage from "html-to-image";
+import { toast } from "sonner";
+
+const SHIFTS = [
+  { label: "Regular", value: "Regular Shift" },
+  { label: "Mid Shift", value: "Mid Shift" },
+  { label: "Half Day", value: "Half Day" },
+];
 
 export default function Home() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [shift, setShift] = useState("Regular Shift");
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<null | { status: string; timeIn: string; date: string }>(null);
@@ -17,17 +25,12 @@ export default function Home() {
   // disable right click
   useEffect(() => {
     const handleRightClick = (e: MouseEvent) => {
-      e.preventDefault(); // disables the right-click menu
-      alert("Right-click is disabled on this page."); // optional message
+      e.preventDefault();
+      toast("Right-click is disabled on this page.");
     };
-
     document.addEventListener("contextmenu", handleRightClick);
-
-    return () => {
-      document.removeEventListener("contextmenu", handleRightClick);
-    };
+    return () => document.removeEventListener("contextmenu", handleRightClick);
   }, []);
-
 
   // Clock (Manila Time)
   useEffect(() => {
@@ -37,45 +40,30 @@ export default function Home() {
       );
       setCurrentTime(manilaNow);
     };
-
-    tick(); // run immediately
+    tick();
     const timer = setInterval(tick, 1000);
-
     return () => clearInterval(timer);
   }, []);
 
-
-  // Detect blocked devices (phones, all Apple devices, iPad Pro A16)
+  // Detect blocked devices
   useEffect(() => {
     const ua = navigator.userAgent;
     const platform = navigator.platform;
-
-    // Phones
     const mobileKeywords = ["Android", "iPhone", "iPod", "Opera Mini", "IEMobile", "Mobile"];
     const isPhone = mobileKeywords.some(k => ua.includes(k));
-
-    // Detect iPad (legacy and modern)
     const isiPad = ua.includes("iPad") || (navigator.maxTouchPoints > 1 && window.innerWidth <= 1024);
-
-    // Specific iPad Pro A16 resolutions
     const isiPadProA16 =
       navigator.maxTouchPoints > 1 &&
-      ((screen.width === 2388 && screen.height === 1668) || // 11-inch
-        (screen.width === 2732 && screen.height === 2048));  // 12.9-inch
-
-    // Block all Apple devices (iPhone, iPad, iPod, Mac)
+      ((screen.width === 2388 && screen.height === 1668) ||
+        (screen.width === 2732 && screen.height === 2048));
     const appleKeywords = ["iPhone", "iPad", "iPod", "Macintosh", "MacIntel", "MacPPC", "Mac68K"];
     const isAppleDevice = appleKeywords.some(k => ua.includes(k) || platform.includes(k));
-
-    if (isPhone || isiPad || isiPadProA16 || isAppleDevice) {
-      setIsBlockedDevice(true);
-    }
+    if (isPhone || isiPad || isiPadProA16 || isAppleDevice) setIsBlockedDevice(true);
   }, []);
 
   const formattedTime = currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true });
   const formattedDate = currentTime.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" });
 
-  // Browser name
   const getBrowserName = (): string => {
     const ua = navigator.userAgent;
     if (ua.includes("Firefox")) return "Firefox";
@@ -85,7 +73,6 @@ export default function Home() {
     return "UnknownBrowser";
   };
 
-  // Capture form as image
   const captureFormAsImage = async (): Promise<File> => {
     if (!formRef.current) throw new Error("Form not found");
     const blob = await htmlToImage.toBlob(formRef.current, { pixelRatio: 2, backgroundColor: "#ffffff" });
@@ -94,25 +81,22 @@ export default function Home() {
     return new File([blob], `timein-${browserName}-${Date.now()}.png`, { type: "image/png" });
   };
 
-  // Time In
   const timeIn = async () => {
     if (isBlockedDevice) {
-      alert("Time In is not allowed on Apple devices or mobile phones.");
+      toast("Time In is not allowed on Apple devices or mobile phones.");
       return;
     }
-
     if (!name || !email) {
-      alert("Please enter your name and email");
+      toast("Please enter your name and email");
       return;
     }
-
     setLoading(true);
-
     try {
       const screenshot = await captureFormAsImage();
       const formData = new FormData();
       formData.append("name", name);
       formData.append("email", email);
+      formData.append("shift", shift); // ← new field sent to API
       formData.append("attachment", screenshot);
 
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
@@ -120,18 +104,19 @@ export default function Home() {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.message);
+        toast(data.message);
         return;
       }
-
       setResult({ status: data.status, timeIn: data.timeIn, date: data.date });
     } catch (err) {
       console.error(err);
-      alert("Failed to capture form.");
+      toast("Failed to capture form.");
     } finally {
       setLoading(false);
     }
   };
+
+  const isDisabled = !!result || isBlockedDevice;
 
   return (
     <main style={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", backgroundColor: "#1a1a1a", fontFamily: "system-ui, -apple-system, sans-serif" }}>
@@ -150,33 +135,89 @@ export default function Home() {
           <p style={{ fontSize: 14, color: "#666", margin: 0 }}>{formattedDate}</p>
         </div>
 
+        {/* Shift Selector */}
+        <div style={{ marginBottom: 28 }}>
+          <label style={{ display: "block", fontWeight: "600", marginBottom: 10, fontSize: 14, color: "#000" }}>Shift</label>
+          <div style={{
+            display: "flex",
+            backgroundColor: "#f5f5f5",
+            borderRadius: 10,
+            padding: 4,
+            gap: 4,
+          }}>
+            {SHIFTS.map(s => {
+              const isActive = shift === s.value;
+              return (
+                <button
+                  key={s.value}
+                  onClick={() => !isDisabled && setShift(s.value)}
+                  disabled={isDisabled}
+                  style={{
+                    flex: 1,
+                    padding: "9px 0",
+                    borderRadius: 7,
+                    border: "none",
+                    fontSize: 13,
+                    fontWeight: isActive ? "700" : "500",
+                    cursor: isDisabled ? "not-allowed" : "pointer",
+                    backgroundColor: isActive ? "#000" : "transparent",
+                    color: isActive ? "#fff" : "#555",
+                    transition: "all 0.18s ease",
+                    boxShadow: isActive ? "0 1px 4px rgba(0,0,0,0.18)" : "none",
+                    letterSpacing: isActive ? "0.01em" : "0",
+                  }}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Full Name */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ display: "block", fontWeight: "600", marginBottom: 8, fontSize: 14, color: "#000" }}>Full Name</label>
-          <input type="text" placeholder="John Smith" value={name} disabled={!!result || isBlockedDevice} onChange={e => setName(e.target.value)} style={{ width: "100%", padding: "12px 16px", borderRadius: 8, border: "1px solid #e5e5e5", fontSize: 15, boxSizing: "border-box", backgroundColor: result || isBlockedDevice ? "#f5f5f5" : "#fff", color: "#000" }} />
+          <input
+            type="text"
+            placeholder="John Smith"
+            value={name}
+            disabled={isDisabled}
+            onChange={e => setName(e.target.value)}
+            style={{ width: "100%", padding: "12px 16px", borderRadius: 8, border: "1px solid #e5e5e5", fontSize: 15, boxSizing: "border-box", backgroundColor: isDisabled ? "#f5f5f5" : "#fff", color: "#000" }}
+          />
         </div>
 
         {/* Email */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ display: "block", fontWeight: "600", marginBottom: 8, fontSize: 14, color: "#000" }}>Email Address</label>
-          <input type="email" placeholder="email@example.com" value={email} disabled={!!result || isBlockedDevice} onChange={e => setEmail(e.target.value)} style={{ width: "100%", padding: "12px 16px", borderRadius: 8, border: "1px solid #e5e5e5", fontSize: 15, boxSizing: "border-box", backgroundColor: result || isBlockedDevice ? "#f5f5f5" : "#fff", color: "#000" }} />
+          <input
+            type="email"
+            placeholder="email@example.com"
+            value={email}
+            disabled={isDisabled}
+            onChange={e => setEmail(e.target.value)}
+            style={{ width: "100%", padding: "12px 16px", borderRadius: 8, border: "1px solid #e5e5e5", fontSize: 15, boxSizing: "border-box", backgroundColor: isDisabled ? "#f5f5f5" : "#fff", color: "#000" }}
+          />
         </div>
 
         {/* Time In Button */}
-        <button onClick={timeIn} disabled={loading || !!result || isBlockedDevice} style={{ width: "100%", padding: 16, backgroundColor: loading || result || isBlockedDevice ? "#666" : "#000", color: "white", border: "none", borderRadius: 8, fontSize: 16, fontWeight: "600", cursor: loading || result || isBlockedDevice ? "not-allowed" : "pointer", transition: "all 0.2s", opacity: loading || result || isBlockedDevice ? 0.6 : 1, marginBottom: 12 }}>
+        <button
+          onClick={timeIn}
+          disabled={loading || isDisabled}
+          style={{ width: "100%", padding: 16, backgroundColor: loading || isDisabled ? "#666" : "#000", color: "white", border: "none", borderRadius: 8, fontSize: 16, fontWeight: "600", cursor: loading || isDisabled ? "not-allowed" : "pointer", transition: "all 0.2s", opacity: loading || isDisabled ? 0.6 : 1, marginBottom: 12 }}
+        >
           {isBlockedDevice ? "Time In unavailable on Mobile/Tablet" : loading ? "Capturing..." : result ? "Time In Recorded" : "Time In"}
         </button>
 
-       
         {/* Result */}
         {result && (
           <div style={{ marginTop: 20, padding: 16, borderRadius: 8, backgroundColor: result.status === "On Time" ? "#dcfce7" : "#fee2e2", border: `1px solid ${result.status === "On Time" ? "#86efac" : "#fca5a5"}`, textAlign: "center" }}>
             <p style={{ margin: 0, fontSize: 15, fontWeight: "600", color: result.status === "On Time" ? "#166534" : "#991b1b" }}>{result.status}</p>
-            <p style={{ margin: "4px 0 0 0", fontSize: 13, color: result.status === "On Time" ? "#166534" : "#991b1b", opacity: 0.8 }}>{result.timeIn} • {result.date}</p>
+            <p style={{ margin: "4px 0 0 0", fontSize: 13, color: result.status === "On Time" ? "#166534" : "#991b1b", opacity: 0.8 }}>{result.timeIn} • {result.date} • {shift}</p>
           </div>
         )}
-      </div>
 
+      </div>
     </main>
   );
 }
