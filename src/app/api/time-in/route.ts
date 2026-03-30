@@ -205,15 +205,6 @@ export async function POST(req: Request) {
         );
       }
 
-      try {
-        addTimeInToQueue(row, imagePath ? [imagePath] : []);
-      } catch {
-        return NextResponse.json(
-          { message: "System busy, please try again later" },
-          { status: 503 }
-        );
-      }
-
       // ✅ Send confirmation email to the employee (non-blocking)
       sendConfirmationEmail({ name, email: normalizedEmail, timeIn, date, status }).catch((err) => {
         logError("Confirmation email failed", err);
